@@ -58,10 +58,10 @@ func main() {
 				start := time.Now()
 
 				// Fetch new API data
-				apiData, err := repositories.FetchDataFromDB(offset)
-				fmt.Println("Api response: ", offset, len(apiData) == 0, len(apiData), apiData)
-
-				if len(apiData) == 0 {
+				// apiData, err := repositories.FetchDataFromDB(offset)
+				logs, err := repositories.FetchFromWazuh(offset)
+				fmt.Println("longs: ", len(logs))
+				if len(logs) == 0 {
 					fmt.Println("Data fetching completed, Stopping ticker.")
 					stopChan <- true
 					return
@@ -76,18 +76,18 @@ func main() {
 				// fmt.Println("Tick Previous: ", memoryData.APIResponse)
 
 				// Update memoryData struct
-				memoryData = Data{
-					Previous:    memoryData.APIResponse,
-					APIResponse: apiData,
-					Timestamp:   time.Now().Format(time.RFC3339),
-				}
+				// memoryData = Data{
+				// 	Previous:    memoryData.APIResponse,
+				// 	APIResponse: apiData,
+				// 	Timestamp:   time.Now().Format(time.RFC3339),
+				// }
 
 				fmt.Printf("Tick done in: %v\n\n", time.Since(start))
 				limit, err := strconv.Atoi(os.Getenv("DATA_LIMIT"))
 				if err != nil {
 					limit = 10
 				}
-				offset += limit
+				offset += 9900 + limit
 			}()
 		}
 	}
