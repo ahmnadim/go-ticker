@@ -1,20 +1,20 @@
 package repositories
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
+	"poc/services"
 	dto "poc/structs"
 	"strconv"
 )
 
-func FetchFromWazuh(offset int) ([]dto.SimplifiedLog, error) {
+func FetchFromWazuh(offset int, search_after []interface{}) ([]dto.SimplifiedLog, []interface{}, error) {
 	limit, err := strconv.Atoi(os.Getenv("DATA_LIMIT"))
 	if err != nil {
 		limit = 10
@@ -26,21 +26,12 @@ func FetchFromWazuh(offset int) ([]dto.SimplifiedLog, error) {
 	wazuh_username := os.Getenv("WAZUH_USERNAME")
 	wazuh_password := os.Getenv("WAZUH_PASSWORD")
 
-	// Parse the base URL
-	baseURL, err := url.Parse(wazuh_url)
-	if err != nil {
-		panic(err)
-	}
+	// Define the JSON body (same as the cURL -d part)
+	jsonBody, _ := services.BuildRequestBody(limit, search_after)
+	// Convert the body to JSON
+	// fmt.Println("body: ", jsonBody, wazuh_url)
 
-	// Add query parameters
-	params := url.Values{}
-	params.Add("size", strconv.Itoa(limit))
-	params.Add("from", strconv.Itoa(offset))
-
-	// Attach the params to the base URL
-	baseURL.RawQuery = params.Encode()
-	fmt.Println("base url: ", baseURL.String())
-	req, err := http.NewRequest("GET", baseURL.String(), nil)
+	req, err := http.NewRequest("GET", wazuh_url, bytes.NewBuffer([]byte(jsonBody)))
 	if err != nil {
 		panic(err)
 	}
@@ -49,6 +40,7 @@ func FetchFromWazuh(offset int) ([]dto.SimplifiedLog, error) {
 	auth := wazuh_username + ":" + wazuh_password
 	encodedAuth := base64.StdEncoding.EncodeToString([]byte(auth))
 	req.Header.Add("Authorization", "Basic "+encodedAuth)
+	req.Header.Set("Content-Type", "application/json")
 
 	// Perform the request
 	// client := &http.Client{}
@@ -64,29 +56,32 @@ func FetchFromWazuh(offset int) ([]dto.SimplifiedLog, error) {
 	defer resp.Body.Close()
 
 	// Read and print the response body
-	body, err := ioutil.ReadAll(resp.Body)
+	res_body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
 
-	if err := json.Unmarshal(body, &res); err != nil {
+	if err := json.Unmarshal(res_body, &res); err != nil {
 		log.Fatalf("Failed to parse JSON: %v", err)
 	}
 
 	var logs []dto.SimplifiedLog
+	var sort []interface{}
 	for _, hit := range res.Hits.Hits {
 		logEntry := dto.SimplifiedLog{
 			ID:        hit.ID,
 			AgentIP:   hit.Source.Agent.IP,
 			AgentName: hit.Source.Agent.Name,
 			Data:      hit.Source.Data,
+			Sort:      hit.Sort,
 		}
 		logs = append(logs, logEntry)
+		sort = logEntry.Sort
 	}
 	if len(logs) == 0 {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return logs, nil
+	return logs, sort, nil
 
 }

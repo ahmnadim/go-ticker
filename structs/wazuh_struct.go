@@ -14,6 +14,7 @@ type WazuhResponse struct {
 				Time      string                 `json:"@timestamp"`
 				Location  string                 `json:"location"`
 			} `json:"_source"`
+			Sort []interface{} `json:"sort"`
 		} `json:"hits"`
 	} `json:"hits"`
 }
@@ -26,4 +27,5 @@ type SimplifiedLog struct {
 	Timestamp string                 `json:"time"`
 	Time      string                 `json:"@timestamp"`
 	Location  string                 `json:"location"`
+	Sort      []interface{}          `json:"sort"`
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"poc/initializers"
-	"poc/models"
 	"poc/repositories"
 	"strconv"
 	"syscall"
@@ -17,22 +16,16 @@ func init() {
 	initializers.ConnectDB()
 }
 
-// Struct to hold data in memory
-type Data struct {
-	Previous    []models.User
-	APIResponse []models.User
-	Timestamp   string
-}
-
-// Global in-memory storage
-var memoryData Data
 var offset = 0
+var sort []interface{}
 
 func main() {
-
 	fmt.Println("Press CTRL + c to stop the ticker.")
-
-	ticker := time.NewTicker(2 * time.Second)
+	tickerInterval, err := strconv.Atoi(os.Getenv("TICKER_INTERVAL"))
+	if err != nil {
+		tickerInterval = 30
+	}
+	ticker := time.NewTicker(time.Duration(tickerInterval) * time.Second)
 	defer ticker.Stop()
 
 	stopChan := make(chan bool)
@@ -57,10 +50,9 @@ func main() {
 
 				start := time.Now()
 
-				// Fetch new API data
-				// apiData, err := repositories.FetchDataFromDB(offset)
-				logs, err := repositories.FetchFromWazuh(offset)
-				fmt.Println("longs: ", len(logs))
+				logs, _sort, err := repositories.FetchFromWazuh(offset, sort)
+				fmt.Println("longs: ", len(logs), sort)
+				sort = _sort
 				if len(logs) == 0 {
 					fmt.Println("Data fetching completed, Stopping ticker.")
 					stopChan <- true
@@ -70,17 +62,6 @@ func main() {
 					fmt.Println("Error fetching from API:", err)
 					return
 				}
-
-				// Show current state
-				// fmt.Printf("Tick:\nPrevious: %d\nAPI Response: %d\n---\n", memoryData.APIResponse, apiData)
-				// fmt.Println("Tick Previous: ", memoryData.APIResponse)
-
-				// Update memoryData struct
-				// memoryData = Data{
-				// 	Previous:    memoryData.APIResponse,
-				// 	APIResponse: apiData,
-				// 	Timestamp:   time.Now().Format(time.RFC3339),
-				// }
 
 				fmt.Printf("Tick done in: %v\n\n", time.Since(start))
 				limit, err := strconv.Atoi(os.Getenv("DATA_LIMIT"))
